@@ -1,0 +1,9 @@
+HAUNTED FOREST — NETLIFY EDITION
+
+1. Visit https://app.netlify.com/drop and drag the ZIP file or the contents of this folder into Netlify Drop.
+2. Netlify gives you a public .netlify.app address. This hosts the visual game ONLY.
+3. For LIVE MULTIPLAYER, also deploy the original Node.js server folder on a WebSocket-capable host such as Render. Set build command npm install and start command npm start.
+4. Copy its HTTPS address (e.g. https://your-game.onrender.com) and paste it into the game's Multiplayer server address box.
+5. Press ENTER THE FOREST and then COPY INVITE. The invitation includes the server URL so other players automatically use the same backend.
+
+IMPORTANT: Netlify static hosting alone cannot run the original long-lived Node.js WebSocket server. Without step 3, the game cannot actually start multiplayer sessions.

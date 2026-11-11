@@ -1,0 +1,9 @@
+{
+  "name": "haunted-forest-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cooperative multiplayer Halloween forest building and monster chase game",
+  "scripts": {"start": "node server.js"},
+  "dependencies": {"ws": "^8.18.0"},
+  "engines": {"node": ">=18"}
+}

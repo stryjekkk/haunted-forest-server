@@ -8,18 +8,18 @@ const forestFloor=[];let rng=2026;function random(){rng=(rng*1664525+1013904223)
 for(let i=0;i<1300;i++)forestFloor.push({x:random()*2200,y:random()*1500,r:random()*2+1,c:random()>.6?'#294338':'#223d3a'});
 function resize(){const d=Math.min(devicePixelRatio||1,2);view.w=innerWidth;view.h=innerHeight;canvas.width=view.w*d;canvas.height=view.h*d;canvas.style.width=view.w+'px';canvas.style.height=view.h+'px';ctx.setTransform(d,0,0,d,0,0);}addEventListener('resize',resize);resize();
 function toast(text){const e=$('toast');e.textContent=text;e.classList.add('show');clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>e.classList.remove('show'),3300);}
-function send(data){if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(data));}
-function join(){let name=$('name').value.trim()||'Explorer';let room=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');const search=new URLSearchParams(location.search);if(!room)room=search.get('room')||'';
-  const configured=$('server').value.trim();
+function send(data){if(ws?.readyState===WebSocket.OPEN){ws.send(JSON.stringify(data));return true;}toast(id?'Disconnected — reload to reconnect.':'Join the game first.');return false;}
+function join(){let name=$('name').value.trim();if(!name){$('error').textContent='Choose your player name first (for example Peter or Nina).';$('name').focus();return;}localStorage.setItem('hauntedForestPlayerName',name);let room=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');const search=new URLSearchParams(location.search);if(!room)room=search.get('room')||'';
+  const configured=$('server').value.trim() || (location.hostname.endsWith('.onrender.com') ? location.origin : 'https://haunted-forest-multiplayer.onrender.com');
   if(!configured){$('error').textContent='Add your multiplayer server address first. Netlify cannot host the live WebSocket room server.';return;}
   let url;
   try {const parsed=new URL(configured);if(!['https:','http:','wss:','ws:'].includes(parsed.protocol))throw Error('Invalid protocol');url=parsed.href.replace(/^http:/,'ws:').replace(/^https:/,'wss:').replace(/\/$/,'');if(location.protocol==='https:' && !url.startsWith('wss:'))throw Error('HTTPS site requires a secure WSS connection');}
   catch{$('error').textContent='Enter a valid HTTPS server URL (for example https://your-game.onrender.com).';return;}
-  localStorage.setItem('hauntedForestServer',configured);
+  $('server').value=configured;localStorage.setItem('hauntedForestServer',configured);
   ws=new WebSocket(url);$('error').textContent='';$('start').disabled=true;
   ws.onopen=()=>send({type:'join',name,room});
   ws.onmessage=event=>{let m;try{m=JSON.parse(event.data)}catch{return;}
-    if(m.type==='welcome'){id=m.id;code=m.code;world={w:m.width,h:m.height};trees=m.trees||[];$('roomcode').textContent=code;$('status').textContent='● CONNECTED';$('landing').style.display='none';history.replaceState(null,'',location.pathname+'?'+new URLSearchParams({room:code,server:$('server').value.trim()}));toast('🌕 Your Halloween adventure begins!');}
+    if(m.type==='welcome'){id=m.id;code=m.code;world={w:m.width,h:m.height};trees=m.trees||[];$('roomcode').textContent=code;$('status').textContent='● CONNECTED';$('landing').style.display='none';if(document.activeElement instanceof HTMLElement)document.activeElement.blur();keys.clear();history.replaceState(null,'',location.pathname+'?'+new URLSearchParams({room:code,server:$('server').value.trim()}));toast('🌕 Your Halloween adventure begins!');}
     if(m.type==='state'){state=m;updateHUD();}
     if(m.type==='notice')toast(m.message);
     if(m.type==='error'){$('error').textContent=m.message;$('start').disabled=false;}
@@ -29,22 +29,23 @@ function join(){let name=$('name').value.trim()||'Explorer';let room=$('room').v
   ws.onclose=()=>{$('status').textContent='● DISCONNECTED';if(id)toast('Disconnected from the forest. Reload to reconnect.');$('start').disabled=false;};
 }
 const query=new URLSearchParams(location.search);const invite=query.get('room');if(invite)$('room').value=invite;
-const serverFromLink=query.get('server');const stored=localStorage.getItem('hauntedForestServer')||'';
-if(serverFromLink||stored)$('server').value=serverFromLink||stored;
-$('start').addEventListener('click',join);$('room').addEventListener('keydown',e=>{if(e.key==='Enter')join()});
+const serverFromLink=query.get('server');const stored=localStorage.getItem('hauntedForestServer')||'';const savedName=localStorage.getItem('hauntedForestPlayerName')||'';$('name').value=savedName;
+if(serverFromLink||stored)$('server').value=serverFromLink||stored;else $('server').value=location.hostname.endsWith('.onrender.com')?location.origin:'https://haunted-forest-multiplayer.onrender.com';
+$('start').addEventListener('click',join);$('name').addEventListener('keydown',e=>{if(e.key==='Enter')join()});$('room').addEventListener('keydown',e=>{if(e.key==='Enter')join()});
 $('copy').addEventListener('click',async()=>{const link=location.origin+location.pathname+'?'+new URLSearchParams({room:code,server:$('server').value.trim()});try{await navigator.clipboard.writeText(link);toast('Invite link copied! Share it with a friend.');}catch{prompt('Copy the invite link:',link);}});
 function action(name){send({type:name});}document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>action(b.dataset.action)));
 document.querySelectorAll('[data-decor]').forEach(b=>b.addEventListener('click',()=>send({type:'decorate',decor:b.dataset.decor})));
 function chatLine(name,message){const p=document.createElement('div'),b=document.createElement('b');b.textContent=name+': ';p.append(b,document.createTextNode(message));$('messages').appendChild(p);while($('messages').children.length>7)$('messages').firstChild.remove();$('messages').scrollTop=$('messages').scrollHeight;}
 $('chat').addEventListener('submit',e=>{e.preventDefault();const input=$('chatinput');if(input.value.trim())send({type:'chat',text:input.value.trim()});input.value='';});
-const prevented=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;const k=e.key.toLowerCase();if(prevented.has(e.key))e.preventDefault();keys.add(k);if(e.repeat)return;if(k==='b')action('build');if(k==='h')action('hide');if('12345'.includes(k)){send({type:'decorate',decor:['pumpkin','ghost','gravestone','lantern','web'][Number(k)-1]});}});addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+const prevented=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;const k=e.key.toLowerCase();if(prevented.has(e.key))e.preventDefault();keys.add(k);if(e.repeat)return;if(k==='b')action('build');if(k==='h')action('hide');if('12345'.includes(k)){send({type:'decorate',decor:['pumpkin','ghost','gravestone','lantern','web'][Number(k)-1]});}});addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.clear()});
 const dirMap={up:'arrowup',down:'arrowdown',left:'arrowleft',right:'arrowright'};
 document.querySelectorAll('[data-dir]').forEach(b=>{const k=dirMap[b.dataset.dir];b.addEventListener('pointerdown',e=>{e.preventDefault();keys.add(k);b.setPointerCapture(e.pointerId)});b.addEventListener('pointerup',()=>keys.delete(k));b.addEventListener('pointercancel',()=>keys.delete(k));b.addEventListener('lostpointercapture',()=>keys.delete(k));});
 function updateHUD(){const me=state.players.find(p=>p.id===id);if(!me)return;
   $('hearts').textContent='♥ '.repeat(me.health)||'—';$('homes').textContent=state.houses.filter(h=>h.owner===id).length+'/3';$('decorCount').textContent=state.decor.filter(d=>d.owner===id).length;$('playerCount').textContent=state.players.length;$('points').textContent=me.score;
   $('players').replaceChildren();for(const p of state.players){const r=document.createElement('div');r.className='playeritem';const d=document.createElement('span');d.className='dot';d.style.background=p.color;const n=document.createElement('span');n.textContent=p.name+(p.id===id?' (you)':'');const s=document.createElement('span');s.textContent=p.hidden?'🏠 Safe':'🏃 Running';r.append(d,n,s);$('players').append(r);}
 }
-function rounded(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}}
+function rounded(x,y,w,h,r,fill,stroke){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}}
 function text(s,x,y,size=14,color='#fff',align='center'){ctx.font=`${size}px Inter,Arial,sans-serif`;ctx.textAlign=align;ctx.fillStyle=color;ctx.fillText(s,x,y);}
 function emojiDraw(s,x,y,size=30){ctx.font=`${size}px serif`;ctx.textAlign='center';ctx.fillText(s,x,y);}
 function tree(t){ctx.fillStyle='#07131060';ctx.beginPath();ctx.ellipse(t.x+8,t.y+13,t.r+14,t.r*.67,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#42372f';ctx.fillRect(t.x-5,t.y-1,10,28);for(let i=0;i<3;i++){ctx.beginPath();ctx.fillStyle=['#102923','#17392e','#214538'][i];ctx.arc(t.x+(i-1)*7,t.y-(i===1?11:3),t.r*(i===1?1.25:.85),0,Math.PI*2);ctx.fill();}ctx.fillStyle='#44634c';ctx.beginPath();ctx.arc(t.x-t.r*.25,t.y-t.r*.6,3,0,Math.PI*2);ctx.fill();}
